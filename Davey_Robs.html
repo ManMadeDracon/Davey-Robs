@@ -11,10 +11,333 @@
 		<tw-story tags>
 			<tw-passage class="passage" aria-live="polite"></tw-passage>
 		</tw-story>
-		<tw-storydata name="Davey&amp;Robs" startnode="1" creator="Twine" creator-version="2.11.1" format="Snowman" format-version="2.1.1" ifid="6FAE1094-D766-4101-B089-2912B786A0D7" options="" tags="" zoom="1" hidden><style role="stylesheet" id="twine-user-stylesheet" type="text/twine-css"></style><script role="script" id="twine-user-script" type="text/twine-javascript"></script><tw-passagedata pid="1" name="Untitled Passage" tags="" position="775,325" size="100,100">&lt;html&gt;
+		<tw-storydata name="Davey&amp;Robs" startnode="1" creator="Twine" creator-version="2.11.1" format="Snowman" format-version="2.1.1" ifid="6FAE1094-D766-4101-B089-2912B786A0D7" options="" tags="" zoom="1" hidden><style role="stylesheet" id="twine-user-stylesheet" type="text/twine-css">#statusBar {
+  text-align: center;
+}
+
+#terminal {
+  background: #000;
+  color: #33ff33;
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+
+  border: 2px solid #1a1a1a;
+  border-radius: 6px;
+  padding: 10px;
+
+  height: 260px;
+  display: flex;
+  flex-direction: column;
+}
+
+#battleLog {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+#battleLog p {
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+}
+
+#commandLine {
+  display: flex;
+  align-items: center;
+}
+
+.inputWrapper {
+  position: relative;
+  flex: 1;
+}
+
+#promptLine {
+  margin-bottom: 4px;
+  font-family: monospace;
+  color: #33ff33;
+}
+
+#textInput {
+  background: transparent;
+  border: none;
+  outline: none;
+
+  color: #33ff33;
+  font-family: inherit;
+  font-size: inherit;
+
+  width: 100%;
+  line-height: 1.4;
+  min-height: 1.4em;
+
+  caret-color: transparent;
+}
+
+/* Fake blinking cursor */
+.cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+
+  pointer-events: none;
+  animation: blink 1s steps(1) infinite;
+}
+
+.cursor::after {
+  content: "█";
+}
+
+.input-locked #textInput {
+  opacity: 0.4;
+}
+
+.input-locked .cursor {
+  opacity: 0;
+}
+
+.cli-symbol {
+  margin-right: 6px;
+  font-family: monospace;
+  color: #33ff33;
+}
+
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+
+#imageContainer {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+#enemyBox {
+  width: 180px;             /* box width */
+  height: 220px;            /* box height including space for health */
+  background-color: #222;   /* dark colored box */
+  border: 2px solid #555;   /* optional border */
+  border-radius: 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 4px;
+}
+
+
+#enemyImageWrapper {
+  width: 160px;             /* slightly smaller than box */
+  height: 160px;            /* square image area */
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #000;    /* black background for contrast */
+}
+
+
+#enemyImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;  /* ensures image scales inside wrapper */
+  display: block;
+}
+
+#enemyStatus {
+  margin-top: 6px;
+  font-family: monospace;
+  color: #ff3333;
+  font-size: 1.1em;
+}</style><script role="script" id="twine-user-script" type="text/twine-javascript">//battle functions:
+
+//useful vars: 
+
+//receiving battle input:
+window.receiveInputBattle = function (event) {
+  event.preventDefault();
+
+  if (typeof s === "undefined") s = {};
+  if (s.inputLocked) return;
+  
+  const input = $("#textInput").val().trim().toLowerCase();
+  $("#textInput").val("");
+  if (!input) return;
+  if (input) simulateBattleTurn(input);
+  
+  
+};
+
+window.simulateBattleTurn = function (inp) {
+  //the final plan is that this takes the player's moves, stops input, checks some datastructure of the currently selected enemy (type?) and decides the enemy's next move, then after turns on input again or ends the battle.
+  if (inp === "kill") {
+    logBattle("You kill the creature.");
+    s.view = "deadGoblin.png"
+    s.enemyHealth = 0;
+  } else if (inp === "attack") {
+    logBattle("You attack the creature.");
+    s.enemyHealth = s.enemyHealth - 1;
+  }
+  
+  if (s.enemyHealth <= 0) {
+    logBattle("The creature has died");
+    s.view = "deadGoblin.png";
+  }
+  renderEnemyHealth();
+  renderStatus();
+  renderEnemy();
+}
+
+//adding to the battle log:
+window.logBattle = function (text) {
+  const log = $("#battleLog");
+  log.append(`<p>> ${text}</p>`);
+  log.scrollTop(log[0].scrollHeight);
+};
+
+//changing prompt in terminal:
+window.setPrompt = function(text) {
+  $("#promptLine").text(text);
+};
+
+//refreshing enemy image:
+window.renderEnemy = function() {
+  const enemyImg = $("#enemyImage");
+  if (enemyImg.length && s.view) {
+    enemyImg.attr("src", s.view);
+  }
+};
+
+//refreshing enemy health:
+window.renderEnemyHealth = function() {
+  let _hearts = "";
+  for (let i = 0; i < s.enemyHealth; i++) {
+  _hearts += "❤️";
+  }
+  $("#enemyHealth").text(_hearts);
+};
+
+//lock input functions:
+window.lockInput = function () {
+  s.inputLocked = true;
+  $("#terminal").addClass("input-locked");
+  $("#textInput").prop("disabled", true);
+};
+window.unlockInput = function () {
+  s.inputLocked = false;
+  $("#terminal").removeClass("input-locked");
+  $("#textInput").prop("disabled", false);
+  $("#textInput").focus();
+  updateCursor();
+};
+
+//who fucking knows:
+$(window).on("sm.passage.shown", function () {
+  
+  const form = $("#commandForm");
+  const input = $("#textInput");
+  if (!form.length || !input.length) return;
+
+  form.off("submit"); // prevent double binding
+  form.on("submit", receiveInputBattle);
+
+  input.on("input keyup focus", updateCursor);
+
+  if (s.inputLocked) {
+    lockInput();
+  } else {
+    unlockInput();
+  }
+  
+  renderStatus();
+  renderEnemyHealth();
+  renderEnemy();
+  input.focus();
+  updateCursor();
+});
+
+
+//update health (automatically?):
+window.renderStatus = function () {
+  let health = "❤️".repeat(s.health);
+  let stamina = "⚡".repeat(s.stamina);
+  $("#statusBar").text(`${health} | ${stamina}`);
+};
+
+//update cursor:
+window.updateCursor = function () {
+  const input = document.getElementById("textInput");
+  const cursor = document.querySelector(".cursor");
+
+  // Create a temporary span to measure text width
+  const span = document.createElement("span");
+  span.style.visibility = "hidden";
+  span.style.position = "absolute";
+  span.style.font = getComputedStyle(input).font;
+  span.textContent = input.value.replace(/ /g, "\u00A0");
+
+  document.body.appendChild(span);
+  const width = span.offsetWidth;
+  document.body.removeChild(span);
+
+  cursor.style.left = width + "px";
+};
+</script><tw-passagedata pid="1" name="Untitled Passage" tags="" position="775,325" size="100,100">&lt;html&gt;
+&lt;body&gt;
 &lt;head&gt;
-Yo wassup Davey
+Yo wassup Davey 
+&lt;%
+if (typeof s === &quot;undefined&quot;) s = {};
+if (typeof s.health === &quot;undefined&quot;) s.health = 10;
+if (typeof s.stamina === &quot;undefined&quot;) s.stamina = 10;
+if (typeof s.inputLocked === &quot;undefined&quot;) s.inputLocked = false;
+if (typeof s.view === &quot;undefined&quot;) s.view = &quot;goblin.jpg&quot;;
+if (typeof s.enemyHealth === &quot;undefined&quot;) s.enemyHealth = 3;
+window.s = window.story.state;
+%&gt;
 &lt;/head&gt;
+[[Start]]
+&lt;/body&gt;
+&lt;/html&gt;</tw-passagedata><tw-passagedata pid="2" name="Start" tags="" position="775,450" size="100,100">&lt;html&gt;
+&lt;head&gt;
+
+&lt;h4 id=&quot;statusBar&quot;&gt;&lt;/h4&gt;
+&lt;/head&gt;
+
+&lt;div id=&quot;imageContainer&quot;&gt;
+	&lt;div id=&quot;enemyBox&quot;&gt;
+    &lt;div id=&quot;enemyImageWrapper&quot;&gt;
+      &lt;img id=&quot;enemyImage&quot; src=&quot;&quot; alt=&quot;Enemy&quot; /&gt;
+      &lt;/div&gt;
+      &lt;div id=&quot;enemyStatus&quot;&gt;
+          &lt;span id=&quot;enemyHealth&quot;&gt;&lt;/span&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div id=&quot;terminal&quot;&gt;
+  &lt;div id=&quot;battleLog&quot;&gt;&lt;/div&gt;
+
+  &lt;!-- Prompt line above input --&gt;
+  &lt;div id=&quot;promptLine&quot; class=&quot;prompt&quot;&gt;
+    What will you do?
+  &lt;/div&gt;
+
+  &lt;form id=&quot;commandForm&quot;&gt;
+    &lt;div id=&quot;commandLine&quot;&gt;
+      &lt;span class=&quot;cli-symbol&quot;&gt;&amp;gt;&lt;/span&gt;
+      &lt;div class=&quot;inputWrapper&quot;&gt;
+        &lt;input id=&quot;textInput&quot; type=&quot;text&quot; autocomplete=&quot;off&quot; /&gt;
+        &lt;span class=&quot;cursor&quot;&gt;&lt;/span&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/form&gt;
+&lt;/div&gt;
+
+&lt;/footer&gt;
 &lt;/html&gt;</tw-passagedata></tw-storydata>	
 	</body>
 </html>
